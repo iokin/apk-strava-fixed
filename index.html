@@ -1,28 +1,307 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <title>StravaMin</title>
-
-    <base href="/" />
-
-    <meta name="color-scheme" content="light dark" />
-    <meta
-      name="viewport"
-      content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <meta name="format-detection" content="telephone=no" />
-    <meta name="msapplication-tap-highlight" content="no" />
-
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#ea580c" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="StravaMin - Tu app personal de carreras y caminatas">
+    <meta name="theme-color" content="#ea580c">
+    <title>StravaMin - Registra tus carreras y caminatas</title>
     <script src="https://cdn.tailwindcss.com"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="./src/main.jsx"></script>
-  </body>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; background: #fafafa; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .animate-pulse { animation: pulse 2s infinite; }
+        .view { display: none; }
+        .view.active { display: block; }
+    </style>
+</head>
+<body class="bg-white">
+    <div id="app" class="min-h-screen flex flex-col">
+        <div id="homeView" class="view active flex-1 overflow-y-auto pb-20">
+            <div class="bg-gradient-to-r from-orange-600 to-red-600 text-white p-6">
+                <h1 class="text-3xl font-bold mb-2">📊 StravaMin</h1>
+                <p class="text-orange-100">Tu app personal de carreras y caminatas</p>
+            </div>
+            <div class="p-4 grid grid-cols-2 gap-4">
+                <div class="bg-white rounded-lg p-4 shadow-md">
+                    <span class="text-sm text-gray-600">Total KM</span>
+                    <p class="text-2xl font-bold text-orange-600" id="totalKm">0.00</p>
+                </div>
+                <div class="bg-white rounded-lg p-4 shadow-md">
+                    <span class="text-sm text-gray-600">Actividades</span>
+                    <p class="text-2xl font-bold text-orange-600" id="totalActivities">0</p>
+                </div>
+                <div class="bg-white rounded-lg p-4 shadow-md">
+                    <span class="text-sm text-gray-600">Ritmo Promedio</span>
+                    <p class="text-2xl font-bold text-orange-600" id="avgPace">0.00</p>
+                </div>
+                <div class="bg-white rounded-lg p-4 shadow-md">
+                    <span class="text-sm text-gray-600">Calorías</span>
+                    <p class="text-2xl font-bold text-orange-600" id="totalCalories">0</p>
+                </div>
+            </div>
+            <div class="p-4">
+                <button onclick="switchView('recordView')" class="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white py-4 rounded-lg font-bold text-lg">
+                    ➕ Nueva Actividad
+                </button>
+            </div>
+            <div class="p-4">
+                <h2 class="text-xl font-bold text-gray-800 mb-3">📱 Últimas Actividades</h2>
+                <div id="activitiesList"></div>
+            </div>
+        </div>
+
+        <div id="recordView" class="view flex-1 overflow-y-auto pb-20">
+            <div class="bg-gradient-to-r from-orange-600 to-red-600 text-white p-6">
+                <button onclick="switchView('homeView')" class="text-orange-100 hover:text-white mb-4">← Volver</button>
+                <h2 class="text-2xl font-bold">Nueva Actividad</h2>
+            </div>
+            <div id="selectTypeView" class="p-4">
+                <h3 class="font-bold text-lg mb-4 text-gray-800">¿Qué vas a hacer?</h3>
+                <button onclick="startTracking('running')" class="w-full p-4 rounded-lg border-2 border-gray-300 mb-3 hover:border-orange-600">
+                    <span class="text-2xl">🏃</span> <span class="font-bold">Carrera</span> <span class="text-sm text-gray-600">(más calorías)</span>
+                </button>
+                <button onclick="startTracking('walking')" class="w-full p-4 rounded-lg border-2 border-gray-300 hover:border-blue-600">
+                    <span class="text-2xl">🚶</span> <span class="font-bold">Caminata</span> <span class="text-sm text-gray-600">(ritmo relajado)</span>
+                </button>
+            </div>
+            <div id="recordingView" class="p-4" style="display:none;">
+                <div class="bg-white rounded-lg p-6 text-center">
+                    <div class="text-6xl mb-4 animate-pulse" id="recordingEmoji">🏃</div>
+                    <div class="text-2xl font-bold text-gray-800 mb-6" id="recordingTitle">Corriendo...</div>
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-orange-50 p-4 rounded-lg">
+                            <p class="text-gray-600 text-sm">Distancia</p>
+                            <p class="text-3xl font-bold text-orange-600" id="liveDistance">0.00 km</p>
+                        </div>
+                        <div class="bg-orange-50 p-4 rounded-lg">
+                            <p class="text-gray-600 text-sm">Tiempo</p>
+                            <p class="text-3xl font-bold text-orange-600" id="liveTime">0:00</p>
+                        </div>
+                        <div class="bg-orange-50 p-4 rounded-lg">
+                            <p class="text-gray-600 text-sm">Ritmo</p>
+                            <p class="text-3xl font-bold text-orange-600" id="liveSpeed">0 km/h</p>
+                        </div>
+                        <div class="bg-orange-50 p-4 rounded-lg">
+                            <p class="text-gray-600 text-sm">Calorías</p>
+                            <p class="text-3xl font-bold text-orange-600" id="liveCalories">0</p>
+                        </div>
+                    </div>
+                    <button onclick="stopTracking()" class="w-full bg-red-600 text-white py-4 rounded-lg font-bold">
+                        ⏹️ Detener Actividad
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="statsView" class="view flex-1 overflow-y-auto pb-20">
+            <div class="bg-gradient-to-r from-orange-600 to-red-600 text-white p-6">
+                <button onclick="switchView('homeView')" class="text-orange-100 hover:text-white mb-4">← Volver</button>
+                <h2 class="text-2xl font-bold">Estadísticas</h2>
+            </div>
+            <div class="p-4" id="statsContent"></div>
+        </div>
+    </div>
+
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around">
+        <button onclick="switchView('homeView')" class="nav-btn flex-1 py-4 flex flex-col items-center gap-1" id="nav0">
+            <span class="text-2xl">🏠</span> <span class="text-xs font-semibold">Inicio</span>
+        </button>
+        <button onclick="switchView('recordView')" class="nav-btn flex-1 py-4 flex flex-col items-center gap-1" id="nav1">
+            <span class="text-2xl">➕</span> <span class="text-xs font-semibold">Registrar</span>
+        </button>
+        <button onclick="switchView('statsView')" class="nav-btn flex-1 py-4 flex flex-col items-center gap-1" id="nav2">
+            <span class="text-2xl">📊</span> <span class="text-xs font-semibold">Stats</span>
+        </button>
+    </div>
+
+    <script>
+        let activities = [];
+        let isTracking = false;
+        let currentActivity = null;
+        let watchId = null;
+        let updateInterval = null;
+
+        function loadActivities() {
+            const saved = localStorage.getItem('strava_activities');
+            if (saved) activities = JSON.parse(saved);
+            updateStats();
+            renderActivities();
+        }
+
+        function saveActivities() {
+            localStorage.setItem('strava_activities', JSON.stringify(activities));
+            updateStats();
+            renderActivities();
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c * 1000;
+        }
+
+        function startTracking(type) {
+            document.getElementById('selectTypeView').style.display = 'none';
+            document.getElementById('recordingView').style.display = 'block';
+
+            const emoji = type === 'running' ? '🏃' : '🚶';
+            const title = type === 'running' ? 'Corriendo...' : 'Caminando...';
+            document.getElementById('recordingEmoji').textContent = emoji;
+            document.getElementById('recordingTitle').textContent = title;
+
+            isTracking = true;
+            currentActivity = {
+                type, startTime: Date.now(), distance: 0, coordinates: [],
+                calories: 0, duration: 0, avgSpeed: 0
+            };
+
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        const speed = (position.coords.speed || 0) * 3.6;
+
+                        if (currentActivity.coordinates.length > 0) {
+                            const last = currentActivity.coordinates[currentActivity.coordinates.length - 1];
+                            currentActivity.distance += calculateDistance(last.latitude, last.longitude, latitude, longitude);
+                        }
+                        currentActivity.coordinates.push({ latitude, longitude, speed });
+                        currentActivity.avgSpeed = speed;
+                    },
+                    () => alert('Por favor, habilita la ubicación'),
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+                );
+
+                updateInterval = setInterval(updateRecordingDisplay, 1000);
+            }
+        }
+
+        function updateRecordingDisplay() {
+            if (!currentActivity) return;
+            const elapsed = Math.floor((Date.now() - currentActivity.startTime) / 1000);
+            const m = Math.floor(elapsed / 60), s = elapsed % 60;
+            const km = (currentActivity.distance / 1000).toFixed(2);
+            const cal = (km * (currentActivity.type === 'running' ? 60 : 30)).toFixed(0);
+
+            document.getElementById('liveDistance').textContent = km + ' km';
+            document.getElementById('liveTime').textContent = `${m}:${String(s).padStart(2,'0')}`;
+            document.getElementById('liveSpeed').textContent = currentActivity.avgSpeed.toFixed(0) + ' km/h';
+            document.getElementById('liveCalories').textContent = cal;
+        }
+
+        function stopTracking() {
+            if (watchId) navigator.geolocation.clearWatch(watchId);
+            if (updateInterval) clearInterval(updateInterval);
+            isTracking = false;
+
+            if (currentActivity && currentActivity.distance > 10) {
+                const newActivity = {
+                    id: Date.now(),
+                    ...currentActivity,
+                    distance: currentActivity.distance / 1000,
+                    duration: Math.floor((Date.now() - currentActivity.startTime) / 1000),
+                    avgPace: currentActivity.distance > 0 ? 
+                        (currentActivity.distance / 1000) / ((Date.now() - currentActivity.startTime) / 3600000) : 0,
+                    calories: (currentActivity.distance / 1000) * (currentActivity.type === 'running' ? 60 : 30)
+                };
+                activities.push(newActivity);
+                saveActivities();
+            }
+
+            currentActivity = null;
+            document.getElementById('selectTypeView').style.display = 'block';
+            document.getElementById('recordingView').style.display = 'none';
+            switchView('homeView');
+        }
+
+        function updateStats() {
+            if (activities.length === 0) {
+                document.getElementById('totalKm').textContent = '0.00';
+                document.getElementById('totalActivities').textContent = '0';
+                document.getElementById('avgPace').textContent = '0.00';
+                document.getElementById('totalCalories').textContent = '0';
+                return;
+            }
+
+            const totalKm = activities.reduce((sum, a) => sum + a.distance, 0);
+            const totalCal = activities.reduce((sum, a) => sum + a.calories, 0);
+            const avgPace = activities.reduce((sum, a) => sum + a.avgPace, 0) / activities.length;
+
+            document.getElementById('totalKm').textContent = totalKm.toFixed(2);
+            document.getElementById('totalActivities').textContent = activities.length;
+            document.getElementById('avgPace').textContent = avgPace.toFixed(2);
+            document.getElementById('totalCalories').textContent = totalCal.toFixed(0);
+        }
+
+        function renderActivities() {
+            const container = document.getElementById('activitiesList');
+            if (activities.length === 0) {
+                container.innerHTML = '<div class="bg-white p-6 rounded-lg text-center text-gray-500"><p>Aún no tienes actividades</p></div>';
+                return;
+            }
+
+            container.innerHTML = activities.slice(-5).reverse().map(a => `
+                <div class="bg-white p-4 rounded-lg shadow-md mb-3">
+                    <div class="flex justify-between mb-2">
+                        <div>
+                            <p class="font-bold text-gray-800">${a.type === 'running' ? '🏃 Carrera' : '🚶 Caminata'}</p>
+                            <p class="text-sm text-gray-500">${new Date(a.id).toLocaleDateString('es-ES')}</p>
+                        </div>
+                        <button onclick="deleteActivity(${a.id})" class="text-red-500">🗑️</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div><span class="text-gray-600">Distancia:</span><p class="font-bold">${a.distance.toFixed(2)} km</p></div>
+                        <div><span class="text-gray-600">Ritmo:</span><p class="font-bold">${a.avgPace.toFixed(2)} km/h</p></div>
+                        <div><span class="text-gray-600">Calorías:</span><p class="font-bold">${a.calories.toFixed(0)}</p></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function deleteActivity(id) {
+            if (confirm('¿Eliminar esta actividad?')) {
+                activities = activities.filter(a => a.id !== id);
+                saveActivities();
+            }
+        }
+
+        function switchView(view) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(view).classList.add('active');
+
+            document.querySelectorAll('.nav-btn').forEach((b, i) => {
+                b.className = 'nav-btn flex-1 py-4 flex flex-col items-center gap-1';
+            });
+            const navMap = { homeView: 0, recordView: 1, statsView: 2 };
+            if (navMap[view] !== undefined) {
+                document.getElementById('nav' + navMap[view]).className += ' text-orange-600 bg-orange-50';
+            }
+
+            if (view === 'statsView') {
+                const container = document.getElementById('statsContent');
+                if (activities.length === 0) {
+                    container.innerHTML = '<div class="bg-white p-6 rounded-lg text-center"><p class="text-gray-500">Sin datos</p></div>';
+                } else {
+                    const totalKm = activities.reduce((s, a) => s + a.distance, 0);
+                    container.innerHTML = `
+                        <div class="bg-white rounded-lg p-4 shadow-md mb-4">
+                            <p class="text-gray-600 text-sm">Total Kilómetros</p>
+                            <p class="text-4xl font-bold text-orange-600">${totalKm.toFixed(2)}</p>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        loadActivities();
+    </script>
+</body>
 </html>
