@@ -8,21 +8,14 @@ workflows:
       events:
         - push
     scripts:
-      - name: Setup Android SDK
+      - name: Build APK
         script: |
-          echo "Setting up Android SDK..."
-          mkdir -p android
+          mkdir -p android/app/src/main/assets/www
+          cp index.html android/app/src/main/assets/www/
+          mkdir -p android/app/src/main/java/com/stravamin/app
+          mkdir -p android/app/src/main
           
-      - name: Create Gradle wrapper
-        script: |
-          cd android
-          gradle wrapper --gradle-version 7.6 || echo "Creating from scratch"
-          cd ..
-          
-      - name: Create build.gradle
-        script: |
-          mkdir -p android
-          cat > android/build.gradle << 'GRADLE'
+          cat > android/build.gradle << 'EOF'
           buildscript {
               repositories {
                   google()
@@ -32,11 +25,9 @@ workflows:
                   classpath 'com.android.tools.build:gradle:7.4.0'
               }
           }
-          GRADLE
+          EOF
           
-      - name: Create settings.gradle
-        script: |
-          cat > android/settings.gradle << 'GRADLE'
+          cat > android/settings.gradle << 'EOF'
           pluginManagement {
               repositories {
                   gradlePluginPortal()
@@ -44,7 +35,6 @@ workflows:
                   mavenCentral()
               }
           }
-          
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories {
@@ -52,23 +42,17 @@ workflows:
                   mavenCentral()
               }
           }
-          
           rootProject.name = "StravaMin"
           include ':app'
-          GRADLE
+          EOF
           
-      - name: Create app/build.gradle
-        script: |
-          mkdir -p android/app
-          cat > android/app/build.gradle << 'GRADLE'
+          cat > android/app/build.gradle << 'EOF'
           plugins {
               id 'com.android.application'
           }
-          
           android {
               namespace 'com.stravamin.app'
               compileSdk 33
-              
               defaultConfig {
                   applicationId 'com.stravamin.app'
                   minSdk 21
@@ -76,40 +60,31 @@ workflows:
                   versionCode 1
                   versionName '1.0.0'
               }
-              
               buildTypes {
                   debug {
                       debuggable true
                   }
               }
           }
-          
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
           }
-          GRADLE
+          EOF
           
-      - name: Create AndroidManifest.xml
-        script: |
-          mkdir -p android/app/src/main
-          cat > android/app/src/main/AndroidManifest.xml << 'MANIFEST'
+          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.stravamin.app">
-              
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
               <uses-permission android:name="android.permission.INTERNET" />
-              
               <application
                   android:allowBackup="true"
                   android:label="StravaMin"
                   android:theme="@style/Theme.AppCompat.Light">
-                  
                   <activity
                       android:name=".MainActivity"
-                      android:exported="true"
-                      android:screenOrientation="portrait">
+                      android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -117,10 +92,37 @@ workflows:
                   </activity>
               </application>
           </manifest>
-          MANIFEST
+          EOF
           
-      - name: Create MainActivity.java
-        script: |
-          mkdir -p android/app/src/main/java/com/stravamin/app
-          cat > android/app/src/main/java/com/stravamin/app/MainActivity.java << 'JAVA'
+          cat > android/app/src/main/java/com/stravamin/app/MainActivity.java << 'EOF'
           package com.stravamin.app;
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import androidx.appcompat.app.AppCompatActivity;
+          public class MainActivity extends AppCompatActivity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  WebView webView = new WebView(this);
+                  setContentView(webView);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.getSettings().setJavaScriptEnabled(true);
+                  webView.getSettings().setDomStorageEnabled(true);
+                  webView.getSettings().setGeolocationEnabled(true);
+                  webView.loadUrl("file:///android_asset/www/index.html");
+              }
+          }
+          EOF
+          
+          cd android
+          gradle wrapper --gradle-version 7.6
+          ./gradlew assembleDebug
+          
+      - name: Copy APK
+        script: |
+          mkdir -p $CM_BUILD_DIR/artifacts
+          cp android/app/build/outputs/apk/debug/app-debug.apk $CM_BUILD_DIR/artifacts/StravaMin.apk
+          
+    artifacts:
+      - $CM_BUILD_DIR/artifacts/StravaMin.apk
