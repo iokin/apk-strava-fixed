@@ -3,35 +3,147 @@ workflows:
     name: Android APK Build
     max_build_duration: 120
     environment:
-      node: 16
       java: 11
     triggering:
       events:
         - push
     scripts:
-      - name: Install Node dependencies
+      - name: Clone and setup
         script: |
-          npm install
-      - name: Build web app
+          echo "Setting up Android project structure..."
+          mkdir -p android/app/src/main/assets
+          
+      - name: Copy web files to assets
         script: |
-          npm run build
-      - name: Install Capacitor CLI
+          cp -r . android/app/src/main/assets/www || true
+          mkdir -p android/app/src/main/java/com/stravamin
+          
+      - name: Create minimal Android project
         script: |
-          npm install -g @capacitor/cli@latest
-      - name: Initialize Capacitor
+          cat > android/build.gradle << 'EOF'
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:7.4.0'
+              }
+          }
+          EOF
+          
+      - name: Create app build.gradle
         script: |
-          npx cap init stravamin com.stravamin.app --web-dir build
-      - name: Add Android
+          mkdir -p android/app
+          cat > android/app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+          
+          android {
+              namespace 'com.stravamin.app'
+              compileSdk 33
+              
+              defaultConfig {
+                  applicationId 'com.stravamin.app'
+                  minSdk 21
+                  targetSdk 33
+                  versionCode 1
+                  versionName '1.0.0'
+              }
+              
+              buildTypes {
+                  release {
+                      debuggable false
+                  }
+              }
+          }
+          EOF
+          
+      - name: Create AndroidManifest.xml
         script: |
-          npx cap add android || true
-      - name: Sync Android
+          mkdir -p android/app/src/main
+          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.stravamin.app">
+              
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+              <uses-permission android:name="android.permission.INTERNET" />
+              
+              <application
+                  android:allowBackup="true"
+                  android:label="StravaMin"
+                  android:icon="@mipmap/ic_launcher"
+                  android:theme="@style/Theme.AppCompat">
+                  
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+          
+      - name: Create MainActivity.java
         script: |
-          npx cap sync android || true
-      - name: Build Android APK
+          mkdir -p android/app/src/main/java/com/stravamin/app
+          cat > android/app/src/main/java/com/stravamin/app/MainActivity.java << 'EOF'
+          package com.stravamin.app;
+          
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import androidx.appcompat.app.AppCompatActivity;
+          
+          public class MainActivity extends AppCompatActivity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  
+                  WebView webView = new WebView(this);
+                  setContentView(webView);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.loadUrl("file:///android_asset/www/index.html");
+              }
+          }
+          EOF
+          
+      - name: Create settings.gradle
         script: |
-          cd android && chmod +x ./gradlew && ./gradlew assembleDebug
-      - name: Copy APK
+          cat > android/settings.gradle << 'EOF'
+          pluginManagement {
+              repositories {
+                  gradlePluginPortal()
+                  google()
+                  mavenCentral()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "StravaMin"
+          include ':app'
+          EOF
+          
+      - name: Build APK
         script: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$CM_BUILD_DIR/app-debug.apk" || true
+          cd android
+          chmod +x ../gradlew || true
+          ./gradlew assembleDebug --stacktrace
+          
+      - name: Copy APK to artifacts
+        script: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$CM_BUILD_DIR/app-debug.apk" || echo "APK not found"
+          
     artifacts:
       - android/app/build/outputs/apk/debug/app-debug.apk
