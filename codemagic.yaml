@@ -9,23 +9,29 @@ workflows:
       events:
         - push
     scripts:
-      - name: Install dependencies
+      - name: Install Node dependencies
         script: |
           npm install
-      - name: Build web
+      - name: Build web app
         script: |
           npm run build
-      - name: Add Android platform
+      - name: Install Capacitor CLI
         script: |
-          npm install -g @capacitor/cli
-          npx cap add android
-          npx cap sync android
-      - name: Build APK
+          npm install -g @capacitor/cli@latest
+      - name: Initialize Capacitor
         script: |
-          cd android
-          ./gradlew assembleDebug
+          npx cap init stravamin com.stravamin.app --web-dir build
+      - name: Add Android
+        script: |
+          npx cap add android || true
+      - name: Sync Android
+        script: |
+          npx cap sync android || true
+      - name: Build Android APK
+        script: |
+          cd android && chmod +x ./gradlew && ./gradlew assembleDebug
       - name: Copy APK
         script: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$CM_BUILD_DIR/app-debug.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$CM_BUILD_DIR/app-debug.apk" || true
     artifacts:
       - android/app/build/outputs/apk/debug/app-debug.apk
