@@ -1,0 +1,14 @@
+{
+  "appId": "com.stravamin.app",
+  "appName": "StravaMin",
+  "webDir": "build",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true
+    }
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
